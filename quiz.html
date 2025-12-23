@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>【稍等】阿里曼测试</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background-color: #f4f4f4;
+      margin: 0;
+    }
+    .container {
+      width: 80%;
+      max-width: 700px;
+      text-align: center;
+    }
+    .intro-text {
+      font-size: 20px;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    .question-section {
+      display: none;
+      margin-top: 20px;
+    }
+    .question-section.active {
+      display: block;
+    }
+    .question {
+      margin-top: 20px;
+      text-align: left;
+    }
+    .question label {
+      display: block;
+      margin: 8px 0;
+      cursor: pointer;
+    }
+    .question input {
+      margin-right: 10px;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .progress {
+      margin-bottom: 20px;
+      font-size: 18px;
+      color: #666;
+    }
+    .feedback {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: left;
+    }
+    .feedback.correct {
+      background-color: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+    }
+    .feedback.incorrect {
+      background-color: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+    }
+    .final-score {
+      font-size: 24px;
+      margin: 20px 0;
+      padding: 20px;
+      background-color: #e7f3ff;
+      border-radius: 10px;
+    }
+    video {
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 介绍页面 -->
+    <div id="intro-section">
+      <div class="intro-text">
+        团队承伤分为三次。<br>
+        第一次按照标记，每次承伤站在承伤圈的圆心处方便判断下次承伤位置。<br>
+        第二次、第三次按照左右行动。<br>
+        1、左固定向左<br>
+        2、右如果脚下有圈则不动，如果无圈向右。<br>
+      </div>
+      <button onclick="startQuiz()">开始答题</button>
+    </div>
+
+    <!-- 题目区域（动态生成） -->
+    <div id="quiz-section" style="display: none;">
+      <div class="progress" id="progress"></div>
+      <div id="question-area"></div>
+      <button id="submit-btn" onclick="submitAnswer()">提交答案</button>
+      <button id="next-btn" onclick="nextQuestion()" style="display: none;">下一题</button>
+      <div id="feedback-area"></div>
+    </div>
+
+    <!-- 最终结果 -->
+    <div id="result-section" style="display: none;">
+      <div class="final-score" id="final-score"></div>
+      <button onclick="restartQuiz()">重新答题</button>
+    </div>
+  </div>
+
+  <script>
+    // ========== 题目配置区域 ==========
+    // 在这里添加新题目，按照以下格式：
+    const quizData = [
+      {
+        video: "1.mp4",  // 视频文件路径
+        question: "问题 1：本次承伤任务分配为：凭知右，棠洲洲左，小知愁右，若即若离左。那么视频中谁站错了？（多选）",
+        options: [
+          { id: "a1", label: "凭知" },
+          { id: "a2", label: "棠洲洲" },
+          { id: "a3", label: "小知愁" },
+          { id: "a4", label: "若即若离" }
+        ],
+        correctAnswers: ["a1", "a2"],  // 正确答案
+        explanation: "本次承伤圈分裂为左边+原地。左边的人向左，右的人原地，所以视频中犯错的人是凭知和棠洲洲。"
+      },
+      // ===== 第二题示例 =====
+      {
+        video: "2.mp4",  // 第二题的视频
+        question: "问题 2：本题目主角是钢炮，他初始位置是boss脚下的斧头，他的任务是斧右左，这次承伤他应该站在哪里？（单选）",
+        options: [
+          { id: "b1", label: "和小灿歌一起" },
+          { id: "b2", label: "大钢炮是对的" }
+        ],
+        correctAnswers: ["b1"],  // 正确答案是选项A和C
+        explanation: "本次分裂与第一题不同，是分裂为一左一右两个承伤圈。左边的人向左，右边的人向右。大钢炮任务是向右。"
+      },
+      // ===== 第三题示例 =====
+      {
+        video: "3.mp4",  // 第三题的视频
+        question: "问题 3：本题目主角依旧是钢炮，大钢炮的任务是斧右左，这次承伤他应该站在哪里？（单选）",
+        options: [
+          { id: "c1", label: "他一动没动，他是对的" },
+          { id: "c2", label: "向左移动一个" },
+          { id: "c3", label: "向右移动一个" }
+        ],
+        correctAnswers: ["c2"],  // 只有答案2正确
+        explanation: "本次承伤圈分裂为左边+原地。左边的人向左，右的人原地，大钢炮任务是左，所以应该选B"
+      }
+      // 继续添加更多题目...
+    ];
+    // ========== 题目配置结束 ==========
+
+    let currentQuestion = 0;
+    let score = 0;
+    let answered = false;
+
+    // 开始答题
+    function startQuiz() {
+      document.getElementById('intro-section').style.display = 'none';
+      document.getElementById('quiz-section').style.display = 'block';
+      currentQuestion = 0;
+      score = 0;
+      showQuestion();
+    }
+
+    // 显示当前题目
+    function showQuestion() {
+      answered = false;
+      const q = quizData[currentQuestion];
+      
+      // 更新进度
+      document.getElementById('progress').innerText = `第 ${currentQuestion + 1} 题 / 共 ${quizData.length} 题`;
+      
+      // 生成题目HTML
+      let html = `
+        <div class="video-container">
+          <video width="640" controls>
+            <source src="${q.video}" type="video/mp4">
+            你的浏览器不支持视频标签。
+          </video>
+        </div>
+        <div class="question">
+          <p><strong>${q.question}</strong></p>
+      `;
+      
+      q.options.forEach(opt => {
+        html += `
+          <label>
+            <input type="checkbox" name="answer" value="${opt.id}">
+            ${opt.label}
+          </label>
+        `;
+      });
+      
+      html += '</div>';
+      
+      document.getElementById('question-area').innerHTML = html;
+      document.getElementById('feedback-area').innerHTML = '';
+      document.getElementById('submit-btn').style.display = 'inline-block';
+      document.getElementById('next-btn').style.display = 'none';
+    }
+
+    // 提交答案
+    function submitAnswer() {
+      if (answered) return;
+      
+      const checkboxes = document.querySelectorAll('input[name="answer"]:checked');
+      const selected = Array.from(checkboxes).map(cb => cb.value);
+      
+      if (selected.length === 0) {
+        alert("请先选择答案！");
+        return;
+      }
+      
+      answered = true;
+      const q = quizData[currentQuestion];
+      
+      // 检查答案
+      const isCorrect = arraysEqual(selected.sort(), q.correctAnswers.sort());
+      
+      if (isCorrect) {
+        score++;
+      }
+      
+      // 显示反馈
+      let feedbackHtml = '';
+      if (isCorrect) {
+        feedbackHtml = `<div class="feedback correct">
+          <p>✅ 恭喜你，回答正确！</p>
+          <p><strong>解析：</strong>${q.explanation}</p>
+        </div>`;
+      } else {
+        const correctLabels = q.correctAnswers.map(id => 
+          q.options.find(opt => opt.id === id)?.label
+        ).join('、');
+        
+        const selectedLabels = selected.map(id => 
+          q.options.find(opt => opt.id === id)?.label
+        ).join('、');
+        
+        feedbackHtml = `<div class="feedback incorrect">
+          <p>❌ 回答错误</p>
+          <p><strong>你的答案：</strong>${selectedLabels}</p>
+          <p><strong>正确答案：</strong>${correctLabels}</p>
+          <p><strong>解析：</strong>${q.explanation}</p>
+        </div>`;
+      }
+      
+      document.getElementById('feedback-area').innerHTML = feedbackHtml;
+      document.getElementById('submit-btn').style.display = 'none';
+      
+      // 判断是否还有下一题
+      if (currentQuestion < quizData.length - 1) {
+        document.getElementById('next-btn').style.display = 'inline-block';
+      } else {
+        // 最后一题，显示结果按钮
+        document.getElementById('next-btn').innerText = '查看结果';
+        document.getElementById('next-btn').style.display = 'inline-block';
+      }
+    }
+
+    // 下一题
+    function nextQuestion() {
+      currentQuestion++;
+      if (currentQuestion < quizData.length) {
+        document.getElementById('next-btn').innerText = '下一题';
+        showQuestion();
+      } else {
+        showResult();
+      }
+    }
+
+    // 显示最终结果
+    function showResult() {
+      document.getElementById('quiz-section').style.display = 'none';
+      document.getElementById('result-section').style.display = 'block';
+      
+      const percentage = Math.round((score / quizData.length) * 100);
+      let message = '';
+      if (percentage === 100) {
+        message = '🎉 恭喜';
+      } else if (percentage >= 80) {
+        message = '👍 错';
+      } else if (percentage >= 60) {
+        message = '💪 大错特错';
+      } else {
+        message = '📚 非常错';
+      }
+      
+      document.getElementById('final-score').innerHTML = `
+        <p>答题完成！</p>
+        <p>你的得分：${score} / ${quizData.length}</p>
+        <p>正确率：${percentage}%</p>
+        <p>${message}</p>
+      `;
+    }
+
+    // 重新答题
+    function restartQuiz() {
+      document.getElementById('result-section').style.display = 'none';
+      document.getElementById('intro-section').style.display = 'block';
+    }
+
+    // 辅助函数：比较两个数组是否相等
+    function arraysEqual(a, b) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false;
+      }
+      return true;
+    }
+  </script>
+</body>
+</html>
